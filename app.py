@@ -1,7 +1,6 @@
 import streamlit as st
 from st_files_connection import FilesConnection
 import pandas as pd
-from datetime import datetime
 
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Tempos e Movimentos", layout="wide", page_icon="🚢")
@@ -10,7 +9,6 @@ st.title("🚢 Sistema de Tempos e Movimentos - Balsas")
 st.write("Controle operacional integrado diretamente com o Google Sheets.")
 
 # 1. CONEXÃO COM A PLANILHA
-# Usa o link que você configurou na aba Secrets do Streamlit
 try:
     conn = st.connection("gsheets", type=FilesConnection)
     df = conn.read(ttl="0")  # ttl="0" força a atualização em tempo real sem cache travado
@@ -73,3 +71,25 @@ with aba2:
         with col7:
             desatracacao = st.text_input("Desatracação (Hora)", placeholder="Ex: 17:00")
         with col8:
+            volume_realizado = st.number_input("Volume Realizado Final (m³ ou Ton)", min_value=0.0, step=10.0)
+
+        # Botão de Enviar dados
+        botao_enviar = st.form_submit_button("Salvar Registro na Planilha")
+
+        if botao_enviar:
+            if not balsa:
+                st.warning("Por favor, preencha pelo menos o nome da Balsa.")
+            else:
+                proxima_linha = len(df) + 2 if not df.empty else 2
+                
+                # Monta a estrutura da linha exatamente na ordem dos seus campos
+                nova_linha = {
+                    "Balsa": balsa,
+                    "Volume de Origem": volume_origem,
+                    "Previsão de atracação": previsao_atracacao,
+                    "Dt Atracação": dt_atracacao,
+                    "Diferença Atracação": f"=D{proxima_linha}-C{proxima_linha}",
+                    "Inicio da Abertura data tampa": inicio_tampa,
+                    "Fim da abaertura da Tampa": fim_tampa,
+                    "Diferença Tampa": f"=G{proxima_linha}-F{proxima_linha}",
+                    "incio da elevação": inicio_
