@@ -1,57 +1,75 @@
+import streamlit as st
+from st_files_connection import FilesConnection
 import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
-# 1. Configuração de Acesso
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('suas_credenciais.json', scope)
-client = gspread.authorize(creds)
+# Configuração da página do Streamlit
+st.set_page_config(page_title="Tempos e Movimentos", layout="wide", page_icon="🚢")
 
-# 2. Criar ou Abrir a Planilha
-spreadsheet_name = "Controle_Tempos_Movimentos_Balsa"
+st.title("🚢 Sistema de Tempos e Movimentos - Balsas")
+st.write("Controle operacional integrado diretamente com o Google Sheets.")
+
+# 1. CONEXÃO COM A PLANILHA
+# Usa o link que você configurou na aba Secrets do Streamlit
 try:
-    sh = client.open(spreadsheet_name)
-except:
-    sh = client.create(spreadsheet_name)
+    conn = st.connection("gsheets", type=FilesConnection)
+    df = conn.read(ttl="0")  # ttl="0" força a atualização em tempo real sem cache travado
+except Exception as e:
+    st.error(f"Erro ao conectar com a planilha. Verifique as configurações de Secrets e Compartilhamento. Detalhes: {e}")
+    df = pd.DataFrame()
 
-worksheet = sh.get_worksheet(0)
+# 2. ABAS DA INTERFACE (Visualização vs Cadastro)
+aba1, aba2 = st.tabs(["📊 Dados Atuais", "➕ Inserir Novo Registro"])
 
-# 3. Estruturação das Colunas (Cabeçalho)
-headers = [
-    "Balsa", "Volume de Origem", "Previsão de Atracação", "Dt Atracação", 
-    "Dif_Atracacao", "Inicio Abertura Tampa", "Fim Abertura Tampa", "Dif_Abertura", 
-    "Inicio Elevacao", "Referencia 52", "Nº Grabadas", "Dif_Elevacao", 
-    "Tendencia Grabada", "Inicio Rechego", "Fim Rechego", "Dif_Rechego", 
-    "Desatracação", "Dif_Total", "Volume Realizado"
-]
+with aba1:
+    st.subheader("Base de Dados Operacional")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Nenhum dado encontrado ou planilha vazia.")
 
-# 4. Exemplo de inserção de uma linha com fórmulas do Google Sheets
-# As fórmulas usam a sintaxe de linha do Sheets (ex: L2, C2, D2)
-row_index = 2  # Supondo que seja a primeira linha de dados após o cabeçalho
-data_row = [
-    "Balsa Alpha",      # Balsa
-    1500,               # Volume Origem
-    "01/06/2024 10:00", # Previsão
-    "01/06/2024 10:15", # Dt Atracação
-    f"=D{row_index}-C{row_index}", # Dif_Atracacao
-    "10:30",            # Inicio Abertura
-    "11:00",            # Fim Abertura
-    f"=G{row_index}-F{row_index}", # Dif_Abertura
-    "11:15",            # Inicio Elevacao
-    "REF-52",           # Referencia 52
-    45,                 # Nº Grabadas
-    "",                 # Dif_Elevacao (Pode ser preenchido manual ou via sensor)
-    f"=S{row_index}/K{row_index}", # Tendencia Grabada (Vol Realizado / Grabadas)
-    "15:00",            # Inicio Rechego
-    "16:00",            # Fim Rechego
-    f"=O{row_index}-N{row_index}", # Dif_Rechego
-    "17:00",            # Desatracação
-    f"=Q{row_index}-D{row_index}", # Dif_Total
-    1480                # Volume Realizado
-]
+with aba2:
+    st.subheader("Formulário de Tempos e Movimentos")
+    st.write("Preencha os dados da operação abaixo:")
 
-# Atualizar cabeçalho e inserir linha
-worksheet.update('A1', [headers], value_input_option='USER_ENTERED')
-worksheet.append_row(data_row, value_input_option='USER_ENTERED')
+    # Criando o formulário estruturado
+    with st.form("formulario_operacao", clear_on_submit=True):
+        
+        # Bloco 1: Identificação e Planejamento
+        col1, col2 = st.columns(2)
+        with col1:
+            balsa = st.text_input("Balsa (Nome/ID)", placeholder="Ex: Balsa Alpha")
+            previsao_atracacao = st.text_input("Previsão de Atracação (Data e Hora)", placeholder="Ex: 01/06/2026 10:00")
+        with col2:
+            volume_origem = st.number_input("Volume de Origem (m³ ou Ton)", min_value=0.0, step=10.0)
+            dt_atracacao = st.text_input("Data/Hora da Atracação Real", placeholder="Ex: 01/06/2026 10:15")
 
-print(f"Planilha '{spreadsheet_name}' atualizada com sucesso!")
+        st.markdown("---")
+        
+        # Bloco 2: Operação da Tampa e Elevação
+        col3, col4 = st.columns(2)
+        with col3:
+            inicio_tampa = st.text_input("Início da Abertura da Tampa (Hora)", placeholder="Ex: 10:30")
+            fim_tampa = st.text_input("Fim da Abertura da Tampa (Hora)", placeholder="Ex: 11:00")
+        with col4:
+            inicio_elevacao = st.text_input("Início da Elevação (Hora)", placeholder="Ex: 11:15")
+            referencia_52 = st.text_input("Referência 52", placeholder="Ex: REF-52")
+
+        st.markdown("---")
+
+        # Bloco 3: Grabadas e Rechego
+        col5, col6 = st.columns(2)
+        with col5:
+            n_grabadas = st.number_input("Nº de Grabadas (Ciclos)", min_value=0, step=1)
+            dif_elevacao = st.text_input("Dif (Tempo de Elevação manual se houver)", placeholder="Ex: 03:45")
+        with col6:
+            inicio_rechego = st.text_input("Início do Rechego (Hora)", placeholder="Ex: 15:00")
+            fim_rechego = st.text_input("Fim do Rechego (Hora)", placeholder="Ex: 16:00")
+
+        st.markdown("---")
+
+        # Bloco 4: Finalização
+        col7, col8 = st.columns(2)
+        with col7:
+            desatracacao = st.text_input("Desatracação (Hora)", placeholder="Ex: 17:00")
+        with col8:
