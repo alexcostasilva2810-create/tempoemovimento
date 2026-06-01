@@ -1,5 +1,4 @@
 import streamlit as st
-from st_files_connection import FilesConnection
 import pandas as pd
 
 # Configuração da página do Streamlit
@@ -8,16 +7,15 @@ st.set_page_config(page_title="Tempos e Movimentos", layout="wide", page_icon="�
 st.title("🚢 Sistema de Tempos e Movimentos - Balsas")
 st.write("Controle operacional integrado diretamente com o Google Sheets.")
 
-# ENDEREÇO DA SUA PLANILHA (Adicionado diretamente para corrigir o erro de 'path')
-url_planilha = "https://docs.google.com/spreadsheets/d/1wKxKgSNGPnKdO7cBcdLil8WxxmpVDCDlJgDupjge7To/edit?gid=0#gid=0"
+# LINK DA PLANILHA CORRIGIDO: Convertido para formato de exportação direta (evita erro de input_format)
+url_planilha = "https://docs.google.com/spreadsheets/d/1wKxKgSNGPnKdO7cBcdLil8WxxmpVDCDlJgDupjge7To/export?format=csv"
 
-# 1. CONEXÃO COM A PLANILHA
+# 1. LEITURA DIRETA E SEGURA DA PLANILHA
 try:
-    conn = st.connection("gsheets", type=FilesConnection)
-    # Correção do erro da imagem: adicionamos o 'url_planilha' dentro da leitura
-    df = conn.read(url_planilha, ttl="0")  
+    # Lendo diretamente como CSV da web de forma nativa e rápida
+    df = pd.read_csv(url_planilha)
 except Exception as e:
-    st.error(f"Erro ao conectar com a planilha. Verifique os Secrets. Detalhes: {e}")
+    st.error(f"Erro ao conectar com a planilha. Certifique-se de que ela está compartilhada como 'Qualquer pessoa com o link pode ler'. Detalhes: {e}")
     df = pd.DataFrame()
 
 # 2. ABAS DA INTERFACE (Visualização vs Cadastro)
@@ -34,7 +32,7 @@ with aba2:
     st.subheader("Formulário de Tempos e Movimentos")
     st.write("Preencha os dados da operação abaixo:")
 
-    # Formulário simplificado e linear
+    # Formulário linear e seguro contra erros de sintaxe
     with st.form("formulario_operacao", clear_on_submit=True):
         
         st.markdown("### 🔹 Planejamento e Atracação")
@@ -46,4 +44,52 @@ with aba2:
         st.markdown("---")
         st.markdown("### 🔹 Operação de Tampa e Elevação")
         inicio_tampa = st.text_input("Início da Abertura da Tampa (Hora)", placeholder="Ex: 10:30")
-        fim_
+        fim_tampa = st.text_input("Fim da Abertura da Tampa (Hora)", placeholder="Ex: 11:00")
+        inicio_elevacao = st.text_input("Início da Elevação (Hora)", placeholder="Ex: 11:15")
+        referencia_52 = st.text_input("Referência 52", placeholder="Ex: REF-52")
+
+        st.markdown("---")
+        st.markdown("### 🔹 Ciclos de Grabadas e Rechego")
+        n_grabadas = st.number_input("Nº de Grabadas (Ciclos)", min_value=0, step=1)
+        dif_elevacao = st.text_input("Dif (Tempo de Elevação manual se houver)", placeholder="Ex: 03:45")
+        inicio_rechego = st.text_input("Início do Rechego (Hora)", placeholder="Ex: 15:00")
+        fim_rechego = st.text_input("Fim do Rechego (Hora)", placeholder="Ex: 16:00")
+
+        st.markdown("---")
+        st.markdown("### 🔹 Finalização")
+        desatracacao = st.text_input("Desatracação (Hora)", placeholder="Ex: 17:00")
+        volume_realizado = st.number_input("Volume Realizado Final (m³ ou Ton)", min_value=0.0, step=10.0)
+
+        # Botão de Enviar dados
+        botao_enviar = st.form_submit_button("Salvar Registro na Planilha")
+
+        if botao_enviar:
+            if not balsa:
+                st.warning("Por favor, preencha pelo menos o nome da Balsa.")
+            else:
+                proxima_linha = len(df) + 2 if not df.empty else 2
+                
+                nova_linha = {
+                    "Balsa": balsa,
+                    "Volume de Origem": volume_origem,
+                    "Previsão de atracação": previsao_atracacao,
+                    "Dt Atracação": dt_atracacao,
+                    "Diferença Atracação": f"=D{proxima_linha}-C{proxima_linha}",
+                    "Inicio da Abertura data tampa": inicio_tampa,
+                    "Fim da abaertura da Tampa": fim_tampa,
+                    "Diferença Tampa": f"=G{proxima_linha}-F{proxima_linha}",
+                    "incio da elevação": inicio_elevacao,
+                    "Referença 52": referencia_52,
+                    "Nº grabadas": n_grabadas,
+                    "dif elevação": dif_elevacao if dif_elevacao else f"=O{proxima_linha}-I{proxima_linha}",
+                    "tendencia da grabada": f"=S{proxima_linha}/K{proxima_linha}",
+                    "Inicio do rechego": inicio_rechego,
+                    "Fim d rechego": fim_rechego,
+                    "dif rechego": f"=O{proxima_linha}-N{proxima_linha}",
+                    "Desatracação": desatracacao,
+                    "dif total": f"=Q{proxima_linha}-D{proxima_linha}",
+                    "Volume Realizado": volume_realizado
+                }
+                
+                st.success(f"Dados da balsa '{balsa}' validados e estruturados com sucesso!")
+                st.json(nova_linha)
