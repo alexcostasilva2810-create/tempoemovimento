@@ -50,4 +50,47 @@ with aba2:
         st.markdown("### 🔹 Ciclos de Grabadas e Rechego")
         n_grabadas = st.number_input("Nº de Grabadas (Ciclos)", min_value=0, step=1)
         dif_elevacao = st.text_input("Dif (Tempo de Elevação manual se houver)", placeholder="Ex: 03:45")
-        inicio_rechego = st.text_input("Início do Rechego (Hora)", placeholder
+        inicio_rechego = st.text_input("Início do Rechego (Hora)", placeholder="Ex: 15:00")
+        fim_rechego = st.text_input("Fim do Rechego (Hora)", placeholder="Ex: 16:00")
+
+        st.markdown("---")
+        st.markdown("### 🔹 Finalização")
+        desatracacao = st.text_input("Desatracação (Hora)", placeholder="Ex: 17:00")
+        volume_realizado = st.number_input("Volume Realizado Final (m³ ou Ton)", min_value=0.0, step=10.0)
+
+        # Botão de Enviar dados
+        botao_enviar = st.form_submit_button("Salvar Registro na Planilha")
+
+        if botao_enviar:
+            if not balsa:
+                st.warning("Por favor, preencha pelo menos o nome da Balsa.")
+            else:
+                # Define a linha do Sheets para aplicar as fórmulas dinâmicas
+                proxima_linha = len(df) + 2 if not df.empty else 2
+                
+                # Cria o dicionário de dados de forma totalmente segura
+                nova_linha = {
+                    "Balsa": balsa,
+                    "Volume de Origem": volume_origem,
+                    "Previsão de atracação": previsao_atracacao,
+                    "Dt Atracação": dt_atracacao,
+                    "Diferença Atracação": f"=D{proxima_linha}-C{proxima_linha}",
+                    "Inicio da Abertura data tampa": inicio_tampa,
+                    "Fim da abaertura da Tampa": fim_tampa,
+                    "Diferença Tampa": f"=G{proxima_linha}-F{proxima_linha}",
+                    "incio da elevação": inicio_elevacao,
+                    "Referença 52": referencia_52,
+                    "Nº grabadas": n_grabadas,
+                    "dif elevação": dif_elevacao if dif_elevacao else f"=O{proxima_linha}-I{proxima_linha}",
+                    "tendencia da grabada": f"=S{proxima_linha}/K{proxima_linha}",
+                    "Inicio do rechego": inicio_rechego,
+                    "Fim d rechego": fim_rechego,
+                    "dif rechego": f"=O{proxima_linha}-N{proxima_linha}",
+                    "Desatracação": desatracacao,
+                    "dif total": f"=Q{proxima_linha}-D{proxima_linha}",
+                    "Volume Realizado": volume_realizado
+                }
+                
+                st.success(f"Dados da balsa '{balsa}' validados com sucesso!")
+                st.info("Para salvar dados permanentemente através de conexões públicas, lembre-se de configurar a planilha como 'Editor' para quem possui o link.")
+                st.json(nova_linha)
